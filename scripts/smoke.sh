@@ -4,7 +4,7 @@
 # ============================================================================
 #
 # WHAT
-#   The CLI equivalent of a Playwright suite. Five independent scenarios
+#   The CLI equivalent of a Playwright suite. Seven independent scenarios
 #   exercise the real release binary against synthetic Rust projects, then
 #   assert on stdout / stderr / exit code / SQLite state.
 #
@@ -27,11 +27,14 @@
 #   5. mcp-stdio          Spawn ast-index-mcp with AST_INDEX_ROOT, send a
 #                         JSON-RPC `initialize` then a `tools/call stats`,
 #                         verify well-formed JSON-RPC responses.
+#   6. codex-dry-run      Verify `install-codex-mcp --dry-run` prints the
+#                         Codex command and TOML fallback without touching
+#                         global Codex config.
 #
 # OUTPUT
 #   On failure, the offending command + output is printed and a per-scenario
 #   log is written under $WORKDIR/logs/<scenario>.log. Final line is
-#   "N/5 scenarios passed". Exit 0 iff N == 5.
+#   "N/7 scenarios passed". Exit 0 iff N == 7.
 #
 # USAGE
 #   bash scripts/smoke.sh                 # run all scenarios
@@ -487,7 +490,39 @@ print('YES' if ok else 'NO')
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 6: perf-budget
+# Scenario 6: codex-dry-run
+# ---------------------------------------------------------------------------
+scenario_codex_dry_run() {
+    local dir="$1/primary"
+    mkdir -p "$dir/src"
+    cat > "$dir/Cargo.toml" <<'EOF'
+[package]
+name = "smoke_codex"
+version = "0.1.0"
+edition = "2021"
+EOF
+    cat > "$dir/src/main.rs" <<'EOF'
+fn main() {}
+EOF
+
+    run_in "$dir" "$AST_INDEX" install-codex-mcp --dry-run || {
+        fail "install-codex-mcp --dry-run exited non-zero"
+        return 1
+    }
+
+    local canonical_dir
+    canonical_dir=$(cd "$dir" && pwd -P)
+    assert_contains "$LAST_OUTPUT" "codex mcp add" "codex dry-run command" || return 1
+    assert_contains "$LAST_OUTPUT" "AST_INDEX_ROOT=$canonical_dir" "codex dry-run root" || return 1
+    assert_contains "$LAST_OUTPUT" "AST_INDEX_BIN=$AST_INDEX" "codex dry-run ast-index bin" || return 1
+    assert_contains "$LAST_OUTPUT" "[mcp_servers.ast-index]" "codex dry-run TOML header" || return 1
+    assert_contains "$LAST_OUTPUT" "command = \"$AST_INDEX_MCP\"" "codex dry-run MCP command" || return 1
+
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 7: perf-budget
 # ---------------------------------------------------------------------------
 # Indexes a real-world corpus (this very repo's `src/`) and asserts that
 # `rebuild`, a typical `search`, and a no-op `update` finish under loose
@@ -594,6 +629,7 @@ SCENARIOS=(
     extra-roots
     json-format
     mcp-stdio
+    codex-dry-run
     perf-budget
 )
 

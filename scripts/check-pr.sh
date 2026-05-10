@@ -51,7 +51,7 @@ run_step "cargo build --release --workspace" \
 run_step "cargo test  --release --workspace" \
     cargo test --release --workspace
 
-run_step "scripts/smoke.sh (6 CLI scenarios)" \
+run_step "scripts/smoke.sh (7 CLI scenarios)" \
     bash "$ROOT/scripts/smoke.sh"
 
 if [ "${RUN_BENCHES:-0}" = "1" ]; then

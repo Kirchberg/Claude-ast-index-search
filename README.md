@@ -60,8 +60,8 @@ brew install ast-index
 ```bash
 git clone https://github.com/defendend/Claude-ast-index-search.git
 cd Claude-ast-index-search
-cargo build --release
-# Binary: target/release/ast-index (~44 MB)
+cargo build --release --workspace
+# Binaries: target/release/ast-index and target/release/ast-index-mcp
 ```
 
 ### Troubleshooting: Syntax errors on install
@@ -137,12 +137,28 @@ compact TOON-inspired text blob (≈2-3× fewer tokens than pretty JSON). Agents
 can opt into raw JSON per-call via `format: "json"` when they need structured
 parsing.
 
-Build:
+Homebrew, npm, and release archives install both `ast-index` and
+`ast-index-mcp`. From source, build both binaries:
 
 ```bash
-cargo build --release -p ast-index-mcp
-# Binary: target/release/ast-index-mcp
+cargo build --release --workspace
 ```
+
+### Codex
+
+```bash
+cd /path/to/project
+ast-index rebuild
+ast-index install-codex-mcp
+```
+
+`install-codex-mcp` registers `ast-index-mcp` with Codex via
+`codex mcp add`, sets `AST_INDEX_ROOT` to the current project, and sets
+`AST_INDEX_BIN` to the current `ast-index` binary. Use
+`ast-index install-codex-mcp --dry-run` to print the command and
+`~/.codex/config.toml` fallback without changing Codex config.
+
+### MCP tools
 
 Exposed tools (20):
 
@@ -284,6 +300,7 @@ ast-index rebuild [--type TYPE]    # Full reindex
 ast-index update                   # Incremental update
 ast-index stats                    # Index statistics
 ast-index version                  # Version info
+ast-index install-codex-mcp        # Register ast-index MCP server in Codex
 ```
 
 ## Language-Specific Features
@@ -491,6 +508,10 @@ exclude:
 ```
 
 ## Changelog
+
+### Unreleased
+- **Codex support** — `ast-index install-codex-mcp` registers the bundled `ast-index-mcp` server with Codex using the current project as `AST_INDEX_ROOT`; `--dry-run` prints the exact `codex mcp add` command and `~/.codex/config.toml` fallback.
+- **MCP binary shipping** — release archives, Homebrew, and npm platform packages now include both `ast-index` and `ast-index-mcp`; release builds and version bumps build the full workspace and keep the MCP crate version aligned with the CLI.
 
 ### 3.40.4
 - **`update` now honours `.ast-index.yaml` (`include` / `exclude`)** — previously only `rebuild` loaded the project config. On a monorepo with `include: [adfox, yabs/adfox]`, `update` would crawl the entire repository (no scope), hang indefinitely on Arcadia-sized trees, and silently pull files outside the configured scope into the DB — making `search` return results from `crypta/`, `sim/`, etc. that were never in `include`. `cmd_update` now loads the config and replaces the primary walker root with the listed sub-paths; paths in the DB stay anchored to the outer root (matching what `rebuild` writes), and `exclude` patterns are applied to every walked entry. `cmd_watch` got the same treatment so file-system watchers stay scoped too. Regression test feeds a seeded DB with two `include` paths and asserts that `crypta/` / `sim/` decoys never enter the index.

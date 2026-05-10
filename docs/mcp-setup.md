@@ -49,7 +49,7 @@ compact text format reliably.
 
 ### Prerequisites
 
-`ast-index` must be on `PATH`. Install per your platform:
+`ast-index` and `ast-index-mcp` must be on `PATH`. Install per your platform:
 
 ```bash
 # macOS / Linux
@@ -57,33 +57,14 @@ brew tap defendend/ast-index
 brew install ast-index
 
 # npm (all platforms)
-npm install -g @defendend/ast-index
+npm install -g @ast-index/cli
 
 # From source
 git clone https://github.com/defendend/Claude-ast-index-search.git
-cd Claude-ast-index-search && cargo build --release
+cd Claude-ast-index-search && cargo build --release --workspace
 ```
 
-Verify: `ast-index version`.
-
-### Build the MCP server
-
-```bash
-git clone https://github.com/defendend/Claude-ast-index-search.git
-cd Claude-ast-index-search
-cargo build --release -p ast-index-mcp
-```
-
-The binary lands at `target/release/ast-index-mcp`. Copy it somewhere on
-`PATH`:
-
-```bash
-cp target/release/ast-index-mcp /usr/local/bin/
-# or, on macOS Apple Silicon
-cp target/release/ast-index-mcp /opt/homebrew/bin/
-```
-
-Verify: `which ast-index-mcp`.
+Verify: `ast-index version` and `which ast-index-mcp`.
 
 ### One-time index build
 
@@ -101,7 +82,7 @@ update` (re-run after pulling fresh trunk) is seconds.
 ## Configure your agent
 
 The MCP server reads stdin / writes stdout — standard stdio transport.
-Every agent has a JSON config where you register it.
+Every agent has a config where you register it.
 
 > In every snippet below, set `AST_INDEX_ROOT` to an absolute path. It
 > becomes the default project root for every tool call. If you work in
@@ -151,19 +132,28 @@ Reload Cursor window.
 
 ### Codex (OpenAI CLI)
 
-Add to `~/.codex/config.json`:
+From the project you want Codex to search:
 
-```json
-{
-  "mcp": {
-    "servers": {
-      "ast-index": {
-        "command": "ast-index-mcp",
-        "env": { "AST_INDEX_ROOT": "/absolute/path/to/your/project" }
-      }
-    }
-  }
-}
+```bash
+cd /absolute/path/to/your/project
+ast-index rebuild
+ast-index install-codex-mcp
+```
+
+The installer runs `codex mcp add`, sets `AST_INDEX_ROOT` to the current
+project, and sets `AST_INDEX_BIN` to the current `ast-index` executable.
+Preview without changing Codex config:
+
+```bash
+ast-index install-codex-mcp --dry-run
+```
+
+Manual fallback for `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.ast-index]
+command = "ast-index-mcp"
+env = { AST_INDEX_ROOT = "/absolute/path/to/your/project", AST_INDEX_BIN = "ast-index" }
 ```
 
 ### Cline (VS Code extension)

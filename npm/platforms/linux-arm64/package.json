@@ -5,7 +5,8 @@
   "os": ["linux"],
   "cpu": ["arm64"],
   "bin": {
-    "ast-index": "./bin/ast-index"
+    "ast-index": "./bin/ast-index",
+    "ast-index-mcp": "./bin/ast-index-mcp"
   },
   "repository": {
     "type": "git",

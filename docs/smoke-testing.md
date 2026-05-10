@@ -40,6 +40,7 @@ Useful env vars:
 | `extra-roots` | After `add-root`, a search for a symbol defined under the extra root returns an **absolute** path (PathResolver regression — see `src/commands/mod.rs::PathResolver`). |
 | `json-format` | `search --format json` and `stats --format json` produce parseable JSON with the expected top-level keys (`symbols`, `files`, `content_matches`, `references` / `project`, `stats`, `db_path`, `db_size_bytes`). |
 | `mcp-stdio` | `ast-index-mcp` accepts `initialize` then `tools/call stats` over stdin and replies with well-formed JSON-RPC 2.0 envelopes (`id` matches, `serverInfo.name == "ast-index-mcp"`, `result.isError == false`). |
+| `codex-dry-run` | `ast-index install-codex-mcp --dry-run` prints the expected `codex mcp add` command and `~/.codex/config.toml` fallback without changing global Codex config. |
 | `perf-budget` | `rebuild` of this repo's `src/` finishes under 30s; max latency over 5 `search --format json` calls under 500ms; no-op `update` under 1s. Tunable via `PERF_REBUILD_MS_MAX`, `PERF_SEARCH_MS_MAX`, `PERF_UPDATE_MS_MAX` env vars. Catches catastrophic regressions, not microbench drift. |
 
 ## Interpreting a failure

@@ -1,6 +1,8 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use ast_index::{db, commands, indexer};
 
@@ -87,6 +89,7 @@ Project Configuration:
   remove-root            Remove source root
   list-roots             List configured source roots
   install-claude-plugin  Install Claude Code plugin
+  install-codex-mcp      Register ast-index MCP server in Codex
 
 Programmatic Access:
   agrep                  Structural code search via ast-grep
@@ -636,6 +639,12 @@ enum Commands {
     Version,
     /// Install Claude Code plugin to ~/.claude/plugins/
     InstallClaudePlugin,
+    /// Register ast-index MCP server in Codex
+    InstallCodexMcp {
+        /// Print the Codex command and config fallback without changing Codex config
+        #[arg(long)]
+        dry_run: bool,
+    },
     // === Programmatic Access ===
     /// Structural code search via ast-grep (requires `sg` installed)
     Agrep {
@@ -808,6 +817,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Commands::InstallClaudePlugin => cmd_install_claude_plugin(),
+        Commands::InstallCodexMcp { dry_run } => cmd_install_codex_mcp(&root, dry_run),
         // Programmatic access
         Commands::Agrep { pattern, lang, json } => commands::grep::cmd_ast_grep(&root, &pattern, lang.as_deref(), json),
         Commands::Query { sql, limit } => commands::management::cmd_query(&root, &sql, limit),
@@ -857,6 +867,183 @@ fn cmd_install_claude_plugin() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CodexMcpInstall {
+    project_root: PathBuf,
+    ast_index_bin: PathBuf,
+    ast_index_mcp_bin: PathBuf,
+}
+
+impl CodexMcpInstall {
+    fn from_env(project_root: &Path) -> Result<Self> {
+        let ast_index_bin = std::env::current_exe()
+            .context("could not determine current ast-index executable path")?;
+        let ast_index_bin = ast_index_bin.canonicalize().unwrap_or(ast_index_bin);
+        let ast_index_mcp_bin =
+            resolve_ast_index_mcp_bin_from(&ast_index_bin, std::env::var_os("PATH").as_ref())?;
+        let project_root = project_root
+            .canonicalize()
+            .unwrap_or_else(|_| project_root.to_path_buf());
+
+        Ok(Self {
+            project_root,
+            ast_index_bin,
+            ast_index_mcp_bin,
+        })
+    }
+
+    fn codex_args(&self) -> Vec<String> {
+        vec![
+            "mcp".to_string(),
+            "add".to_string(),
+            "--env".to_string(),
+            format!("AST_INDEX_ROOT={}", path_string(&self.project_root)),
+            "--env".to_string(),
+            format!("AST_INDEX_BIN={}", path_string(&self.ast_index_bin)),
+            "ast-index".to_string(),
+            path_string(&self.ast_index_mcp_bin),
+        ]
+    }
+
+    fn fallback_config_toml(&self) -> String {
+        format!(
+            "[mcp_servers.ast-index]\ncommand = {}\nenv = {{ AST_INDEX_ROOT = {}, AST_INDEX_BIN = {} }}\n",
+            toml_string(&path_string(&self.ast_index_mcp_bin)),
+            toml_string(&path_string(&self.project_root)),
+            toml_string(&path_string(&self.ast_index_bin)),
+        )
+    }
+
+    fn dry_run_output(&self) -> String {
+        let mut command = vec!["codex".to_string()];
+        command.extend(self.codex_args());
+        format!(
+            "Would run:\n  {}\n\nFallback ~/.codex/config.toml:\n{}",
+            shell_join(&command),
+            self.fallback_config_toml()
+        )
+    }
+}
+
+fn cmd_install_codex_mcp(root: &Path, dry_run: bool) -> Result<()> {
+    let install = CodexMcpInstall::from_env(root)?;
+
+    if dry_run {
+        print!("{}", install.dry_run_output());
+        return Ok(());
+    }
+
+    println!("Registering ast-index MCP server in Codex...");
+    let args = install.codex_args();
+    let status = Command::new("codex").args(&args).status();
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("Codex MCP server 'ast-index' registered.");
+            println!("Run `ast-index rebuild` in this project before querying it from Codex.");
+            Ok(())
+        }
+        Ok(s) => {
+            eprintln!("codex mcp add exited with {s}.");
+            print_codex_fallback(&install);
+            Err(anyhow::anyhow!("failed to register ast-index MCP server in Codex"))
+        }
+        Err(e) => {
+            eprintln!("could not run `codex`: {e}");
+            print_codex_fallback(&install);
+            Err(anyhow::anyhow!("codex CLI not found or not executable"))
+        }
+    }
+}
+
+fn print_codex_fallback(install: &CodexMcpInstall) {
+    eprintln!("\nAdd this to ~/.codex/config.toml manually:");
+    eprintln!("{}", install.fallback_config_toml());
+}
+
+fn resolve_ast_index_mcp_bin_from(
+    current_exe: &Path,
+    path_env: Option<&OsString>,
+) -> Result<PathBuf> {
+    let exe_name = ast_index_mcp_exe_name();
+
+    if let Some(dir) = current_exe.parent() {
+        let sibling = dir.join(exe_name);
+        if sibling.is_file() {
+            return Ok(sibling);
+        }
+    }
+
+    if let Some(found) = find_on_path(exe_name, path_env) {
+        return Ok(found);
+    }
+
+    Err(anyhow::anyhow!(
+        "could not find `{}` next to `{}` or on PATH; install a release that includes ast-index-mcp, or build with `cargo build --release --workspace`",
+        exe_name,
+        current_exe.display()
+    ))
+}
+
+fn ast_index_mcp_exe_name() -> &'static str {
+    if cfg!(windows) {
+        "ast-index-mcp.exe"
+    } else {
+        "ast-index-mcp"
+    }
+}
+
+fn find_on_path(exe_name: &str, path_env: Option<&OsString>) -> Option<PathBuf> {
+    let path_env = path_env?;
+    for dir in std::env::split_paths(path_env) {
+        let candidate = dir.join(exe_name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+fn toml_string(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for ch in value.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push_str(&format!("\\u{:04X}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+fn shell_join(args: &[String]) -> String {
+    args.iter()
+        .map(|arg| shell_quote(arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn shell_quote(arg: &str) -> String {
+    if !arg.is_empty()
+        && arg
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '=' | ':'))
+    {
+        return arg.to_string();
+    }
+    format!("'{}'", arg.replace('\'', "'\\''"))
 }
 
 fn find_project_root_for_write() -> Result<PathBuf> {
@@ -1278,5 +1465,107 @@ mod root_lookup_tests {
             got, root,
             "walk_up=true without any DB falls back to marker walk"
         );
+    }
+}
+
+#[cfg(test)]
+mod codex_mcp_install_tests {
+    use super::*;
+    use std::ffi::OsString;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn fake_exe(dir: &std::path::Path, stem: &str) -> PathBuf {
+        let name = if cfg!(windows) {
+            format!("{stem}.exe")
+        } else {
+            stem.to_string()
+        };
+        let path = dir.join(name);
+        fs::write(&path, b"").unwrap();
+        path
+    }
+
+    #[test]
+    fn codex_mcp_add_args_include_root_bin_and_server() {
+        let install = CodexMcpInstall {
+            project_root: PathBuf::from("/repo"),
+            ast_index_bin: PathBuf::from("/bin/ast-index"),
+            ast_index_mcp_bin: PathBuf::from("/bin/ast-index-mcp"),
+        };
+
+        assert_eq!(
+            install.codex_args(),
+            vec![
+                "mcp",
+                "add",
+                "--env",
+                "AST_INDEX_ROOT=/repo",
+                "--env",
+                "AST_INDEX_BIN=/bin/ast-index",
+                "ast-index",
+                "/bin/ast-index-mcp",
+            ]
+        );
+    }
+
+    #[test]
+    fn fallback_config_escapes_toml_strings() {
+        let install = CodexMcpInstall {
+            project_root: PathBuf::from("/repo/with \"quotes\""),
+            ast_index_bin: PathBuf::from("/bin/ast\\index"),
+            ast_index_mcp_bin: PathBuf::from("/bin/ast-index-mcp"),
+        };
+
+        assert_eq!(
+            install.fallback_config_toml(),
+            "[mcp_servers.ast-index]\n\
+             command = \"/bin/ast-index-mcp\"\n\
+             env = { AST_INDEX_ROOT = \"/repo/with \\\"quotes\\\"\", AST_INDEX_BIN = \"/bin/ast\\\\index\" }\n"
+        );
+    }
+
+    #[test]
+    fn dry_run_output_contains_command_and_fallback_config() {
+        let install = CodexMcpInstall {
+            project_root: PathBuf::from("/repo"),
+            ast_index_bin: PathBuf::from("/bin/ast-index"),
+            ast_index_mcp_bin: PathBuf::from("/bin/ast-index-mcp"),
+        };
+
+        let out = install.dry_run_output();
+        assert!(out.contains("codex mcp add --env AST_INDEX_ROOT=/repo"));
+        assert!(out.contains("AST_INDEX_BIN=/bin/ast-index"));
+        assert!(out.contains("[mcp_servers.ast-index]"));
+        assert!(out.contains("command = \"/bin/ast-index-mcp\""));
+    }
+
+    #[test]
+    fn resolve_mcp_bin_prefers_current_exe_directory() {
+        let tmp = TempDir::new().unwrap();
+        let current_exe = fake_exe(tmp.path(), "ast-index");
+        let sibling_mcp = fake_exe(tmp.path(), "ast-index-mcp");
+        let path_dir = tmp.path().join("path-bin");
+        fs::create_dir_all(&path_dir).unwrap();
+        fake_exe(&path_dir, "ast-index-mcp");
+
+        let got = resolve_ast_index_mcp_bin_from(&current_exe, Some(&OsString::from(&path_dir)))
+            .unwrap();
+
+        assert_eq!(got, sibling_mcp);
+    }
+
+    #[test]
+    fn resolve_mcp_bin_falls_back_to_path() {
+        let tmp = TempDir::new().unwrap();
+        let current_exe = fake_exe(tmp.path(), "ast-index");
+        let path_dir = tmp.path().join("path-bin");
+        fs::create_dir_all(&path_dir).unwrap();
+        let path_mcp = fake_exe(&path_dir, "ast-index-mcp");
+
+        let got = resolve_ast_index_mcp_bin_from(&current_exe, Some(&OsString::from(&path_dir)))
+            .unwrap();
+
+        assert_eq!(got, path_mcp);
     }
 }
