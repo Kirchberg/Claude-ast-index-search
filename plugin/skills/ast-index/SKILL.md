@@ -338,6 +338,7 @@ ast-index version                    # Show CLI version
 ast-index help                       # Show help message
 ast-index help <command>             # Show help for specific command
 ast-index install-claude-plugin      # Install Claude Code plugin to ~/.claude/plugins/
+ast-index install-codex-mcp          # Register ast-index MCP server in Codex
 ```
 
 ## Programmatic Access (SQL & SDK)

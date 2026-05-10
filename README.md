@@ -60,8 +60,8 @@ brew install ast-index
 ```bash
 git clone https://github.com/defendend/Claude-ast-index-search.git
 cd Claude-ast-index-search
-cargo build --release
-# Binary: target/release/ast-index (~44 MB)
+cargo build --release --workspace
+# Binaries: target/release/ast-index and target/release/ast-index-mcp
 ```
 
 ### Troubleshooting: Syntax errors on install
@@ -129,7 +129,21 @@ Restart Claude Code to activate. Update: `brew upgrade ast-index && claude plugi
 
 See [`examples/.claude/rules/ast-index.md`](examples/.claude/rules/ast-index.md) for a template rules file that teaches the agent to prefer ast-index over grep, outline before reading large files, and pass the same instructions to subagents. Adapt before dropping into your project's `.claude/rules/`.
 
-### MCP server (Cursor, Codex, Cline, Continue, OpenCode, Windsurf, …)
+### Codex
+
+```bash
+cd /path/to/project
+ast-index rebuild
+ast-index install-codex-mcp
+```
+
+`install-codex-mcp` registers `ast-index-mcp` with Codex via
+`codex mcp add`, sets `AST_INDEX_ROOT` to the current project, and sets
+`AST_INDEX_BIN` to the current `ast-index` binary. Use
+`ast-index install-codex-mcp --dry-run` to print the command and
+`~/.codex/config.toml` fallback without changing Codex config.
+
+### MCP server (Cursor, Cline, Continue, OpenCode, Windsurf, …)
 
 An MCP server that exposes ast-index tools to any MCP-compatible agent. Each
 tool call spawns `ast-index <subcommand>`, parses the output, and returns a
@@ -137,11 +151,11 @@ compact TOON-inspired text blob (≈2-3× fewer tokens than pretty JSON). Agents
 can opt into raw JSON per-call via `format: "json"` when they need structured
 parsing.
 
-Build:
+Homebrew, npm, and release archives install both `ast-index` and
+`ast-index-mcp`. From source, build both binaries:
 
 ```bash
-cargo build --release -p ast-index-mcp
-# Binary: target/release/ast-index-mcp
+cargo build --release --workspace
 ```
 
 Exposed tools (20):

@@ -59,19 +59,19 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --workspace --target ${{ matrix.target }}
 
       - name: Package (unix)
         if: matrix.name != 'windows-x86_64'
         run: |
           cd target/${{ matrix.target }}/release
-          tar -czvf ../../../ast-index-${{ env.RELEASE_TAG }}-${{ matrix.name }}.tar.gz ast-index
+          tar -czvf ../../../ast-index-${{ env.RELEASE_TAG }}-${{ matrix.name }}.tar.gz ast-index ast-index-mcp
 
       - name: Package (windows)
         if: matrix.name == 'windows-x86_64'
         shell: pwsh
         run: |
-          Compress-Archive -Path "target/${{ matrix.target }}/release/ast-index.exe" -DestinationPath "ast-index-${{ env.RELEASE_TAG }}-${{ matrix.name }}.zip"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/ast-index.exe","target/${{ matrix.target }}/release/ast-index-mcp.exe" -DestinationPath "ast-index-${{ env.RELEASE_TAG }}-${{ matrix.name }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -87,12 +87,16 @@ jobs:
 
       - name: Copy binary to npm platform package (unix)
         if: matrix.name != 'windows-x86_64'
-        run: cp target/${{ matrix.target }}/release/ast-index npm/platforms/${{ matrix.npm_suffix }}/bin/ast-index
+        run: |
+          cp target/${{ matrix.target }}/release/ast-index npm/platforms/${{ matrix.npm_suffix }}/bin/ast-index
+          cp target/${{ matrix.target }}/release/ast-index-mcp npm/platforms/${{ matrix.npm_suffix }}/bin/ast-index-mcp
 
       - name: Copy binary to npm platform package (windows)
         if: matrix.name == 'windows-x86_64'
         shell: pwsh
-        run: Copy-Item "target/${{ matrix.target }}/release/ast-index.exe" "npm/platforms/${{ matrix.npm_suffix }}/bin/ast-index.exe"
+        run: |
+          Copy-Item "target/${{ matrix.target }}/release/ast-index.exe" "npm/platforms/${{ matrix.npm_suffix }}/bin/ast-index.exe"
+          Copy-Item "target/${{ matrix.target }}/release/ast-index-mcp.exe" "npm/platforms/${{ matrix.npm_suffix }}/bin/ast-index-mcp.exe"
 
       - name: Publish npm platform package
         run: cd npm/platforms/${{ matrix.npm_suffix }} && npm publish --access public
@@ -205,10 +209,12 @@ jobs:
 
             def install
               bin.install "ast-index"
+              bin.install "ast-index-mcp"
             end
 
             test do
               assert_match "ast-index v${VERSION}", shell_output("#{bin}/ast-index version")
+              assert_predicate bin/"ast-index-mcp", :executable?
             end
           end
           FORMULA

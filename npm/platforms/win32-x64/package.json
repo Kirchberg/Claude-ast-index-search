@@ -5,7 +5,8 @@
   "os": ["win32"],
   "cpu": ["x64"],
   "bin": {
-    "ast-index": "./bin/ast-index.exe"
+    "ast-index": "./bin/ast-index.exe",
+    "ast-index-mcp": "./bin/ast-index-mcp.exe"
   },
   "repository": {
     "type": "git",

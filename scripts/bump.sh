@@ -32,6 +32,10 @@ echo "Bumping $CURRENT → $VERSION"
 sed -i '' "s/^version = \"$CURRENT\"/version = \"$VERSION\"/" Cargo.toml
 echo "  ✓ Cargo.toml"
 
+# 1b. MCP crate Cargo.toml
+sed -i '' "s/^version = \"$CURRENT\"/version = \"$VERSION\"/" crates/ast-index-mcp/Cargo.toml
+echo "  ✓ crates/ast-index-mcp/Cargo.toml"
+
 # 2. README.md title
 sed -i '' "s/# ast-index v$CURRENT/# ast-index v$VERSION/" README.md
 echo "  ✓ README.md"
@@ -65,10 +69,10 @@ done
 # 8. Build and test
 echo ""
 echo "Building release..."
-cargo build --release
+cargo build --release --workspace
 echo ""
 echo "Running tests..."
-cargo test --quiet
+cargo test --release --workspace
 
 # Verify version
 BUILT_VERSION=$(./target/release/ast-index version 2>&1)
@@ -78,7 +82,7 @@ echo "Built: $BUILT_VERSION"
 # 9. Commit, tag, push
 echo ""
 echo "Committing..."
-git add Cargo.toml Cargo.lock README.md \
+git add Cargo.toml Cargo.lock crates/ast-index-mcp/Cargo.toml README.md \
     plugin/.claude-plugin/plugin.json \
     .claude-plugin/plugin.json \
     .claude-plugin/marketplace.json \
