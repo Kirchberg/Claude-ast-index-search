@@ -60,8 +60,8 @@ brew install ast-index
 ```bash
 git clone https://github.com/defendend/Claude-ast-index-search.git
 cd Claude-ast-index-search
-cargo build --release
-# Binary: target/release/ast-index (~44 MB)
+cargo build --release --workspace
+# Binaries: target/release/ast-index and target/release/ast-index-mcp
 ```
 
 ### Troubleshooting: Syntax errors on install
@@ -139,8 +139,7 @@ ast-index install-codex-mcp
 
 `install-codex-mcp` registers `ast-index-mcp` with Codex via
 `codex mcp add`, sets `AST_INDEX_ROOT` to the current project, and sets
-`AST_INDEX_BIN` to the current `ast-index` binary. It expects
-`ast-index-mcp` next to `ast-index` or on `PATH`. Use
+`AST_INDEX_BIN` to the current `ast-index` binary. Use
 `ast-index install-codex-mcp --dry-run` to print the command and
 `~/.codex/config.toml` fallback without changing Codex config.
 
@@ -152,11 +151,11 @@ compact TOON-inspired text blob (≈2-3× fewer tokens than pretty JSON). Agents
 can opt into raw JSON per-call via `format: "json"` when they need structured
 parsing.
 
-Build:
+Homebrew, npm, and release archives install both `ast-index` and
+`ast-index-mcp`. From source, build both binaries:
 
 ```bash
-cargo build --release -p ast-index-mcp
-# Binary: target/release/ast-index-mcp
+cargo build --release --workspace
 ```
 
 Exposed tools (20):

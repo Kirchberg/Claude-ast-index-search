@@ -19,7 +19,8 @@
     "tree-sitter"
   ],
   "bin": {
-    "ast-index": "./bin/ast-index"
+    "ast-index": "./bin/ast-index",
+    "ast-index-mcp": "./bin/ast-index-mcp"
   },
   "optionalDependencies": {
     "@ast-index/cli-darwin-arm64": "3.40.4",

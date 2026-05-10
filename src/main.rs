@@ -1026,7 +1026,7 @@ fn resolve_ast_index_mcp_bin_from(
     }
 
     Err(anyhow::anyhow!(
-        "could not find `{}` next to `{}` or on PATH; build it with `cargo build --release -p ast-index-mcp` and copy it next to ast-index or onto PATH",
+        "could not find `{}` next to `{}` or on PATH; install a release that includes ast-index-mcp, or build with `cargo build --release --workspace`",
         exe_name,
         current_exe.display()
     ))

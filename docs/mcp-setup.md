@@ -49,7 +49,7 @@ compact text format reliably.
 
 ### Prerequisites
 
-`ast-index` must be on `PATH`. Install per your platform:
+`ast-index` and `ast-index-mcp` must be on `PATH`. Install per your platform:
 
 ```bash
 # macOS / Linux
@@ -57,33 +57,14 @@ brew tap defendend/ast-index
 brew install ast-index
 
 # npm (all platforms)
-npm install -g @defendend/ast-index
+npm install -g @ast-index/cli
 
 # From source
 git clone https://github.com/defendend/Claude-ast-index-search.git
-cd Claude-ast-index-search && cargo build --release
+cd Claude-ast-index-search && cargo build --release --workspace
 ```
 
-Verify: `ast-index version`.
-
-### Build the MCP server
-
-```bash
-git clone https://github.com/defendend/Claude-ast-index-search.git
-cd Claude-ast-index-search
-cargo build --release -p ast-index-mcp
-```
-
-The binary lands at `target/release/ast-index-mcp`. Copy it somewhere on
-`PATH`:
-
-```bash
-cp target/release/ast-index-mcp /usr/local/bin/
-# or, on macOS Apple Silicon
-cp target/release/ast-index-mcp /opt/homebrew/bin/
-```
-
-Verify: `which ast-index-mcp`.
+Verify: `ast-index version` and `which ast-index-mcp`.
 
 ### One-time index build
 
@@ -161,8 +142,7 @@ ast-index install-codex-mcp
 
 The installer runs `codex mcp add`, sets `AST_INDEX_ROOT` to the current
 project, and sets `AST_INDEX_BIN` to the current `ast-index` executable.
-It expects `ast-index-mcp` next to `ast-index` or on `PATH`. Preview
-without changing Codex config:
+Preview without changing Codex config:
 
 ```bash
 ast-index install-codex-mcp --dry-run

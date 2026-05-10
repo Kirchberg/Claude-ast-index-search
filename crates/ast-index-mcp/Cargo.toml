@@ -1,6 +1,6 @@
 [package]
 name = "ast-index-mcp"
-version = "0.1.0"
+version = "3.40.4"
 edition = "2021"
 description = "MCP server that exposes ast-index commands to AI coding agents (Claude Code, Cursor, Codex, Cline, Continue, OpenCode, Windsurf, etc.)"
 license = "MIT"

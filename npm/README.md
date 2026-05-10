@@ -1,6 +1,6 @@
 # @ast-index/cli
 
-Fast AST-based code search CLI for 30 programming languages. Native Rust binary distributed via npm.
+Fast AST-based code search CLI for 30 programming languages. Native Rust binaries distributed via npm.
 
 ## Install
 
@@ -15,6 +15,8 @@ npx @ast-index/cli rebuild
 npx @ast-index/cli search MyClass
 ```
 
+The package installs both `ast-index` and `ast-index-mcp`.
+
 ## Supported Languages
 
 Kotlin, Java, Swift, Objective-C, TypeScript, JavaScript, Vue, Svelte, Rust, Ruby, C#, Python, Go, C++, Scala, PHP, Dart, Perl, Lua, Elixir, Bash, SQL, R, Matlab, Groovy, Common Lisp, GDScript, BSL, Protocol Buffers, WSDL/XSD.
@@ -24,6 +26,9 @@ Kotlin, Java, Swift, Objective-C, TypeScript, JavaScript, Vue, Svelte, Rust, Rub
 ```bash
 # Index your project
 ast-index rebuild
+
+# Register the bundled MCP server with Codex
+ast-index install-codex-mcp
 
 # Search symbols
 ast-index search MyClass

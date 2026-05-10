@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "ast-index-mcp"
-version = "0.1.0"
+version = "3.40.4"
 dependencies = [
  "anyhow",
  "serde",
