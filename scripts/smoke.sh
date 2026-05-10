@@ -30,6 +30,9 @@
 #   6. codex-dry-run      Verify `install-codex-mcp --dry-run` prints the
 #                         Codex command and TOML fallback without touching
 #                         global Codex config.
+#   7. perf-budget        Rebuild a generated Rust fixture and fail if the
+#                         release binary regresses beyond the configured
+#                         elapsed-time budget.
 #
 # OUTPUT
 #   On failure, the offending command + output is printed and a per-scenario

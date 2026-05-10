@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -878,11 +878,22 @@ struct CodexMcpInstall {
 
 impl CodexMcpInstall {
     fn from_env(project_root: &Path) -> Result<Self> {
-        let ast_index_bin = std::env::current_exe()
+        let path_env = std::env::var_os("PATH");
+        let current_exe = std::env::current_exe()
             .context("could not determine current ast-index executable path")?;
-        let ast_index_bin = ast_index_bin.canonicalize().unwrap_or(ast_index_bin);
+        let cwd = std::env::current_dir().context("could not determine current directory")?;
+        let argv0 = std::env::args_os().next();
+        let ast_index_bin =
+            resolve_ast_index_bin_from(argv0.as_deref(), &cwd, path_env.as_ref())
+                .unwrap_or_else(|| current_exe.clone());
         let ast_index_mcp_bin =
-            resolve_ast_index_mcp_bin_from(&ast_index_bin, std::env::var_os("PATH").as_ref())?;
+            resolve_ast_index_mcp_bin_from(&ast_index_bin, path_env.as_ref()).or_else(|err| {
+                if current_exe == ast_index_bin {
+                    Err(err)
+                } else {
+                    resolve_ast_index_mcp_bin_from(&current_exe, path_env.as_ref()).map_err(|_| err)
+                }
+            })?;
         let project_root = project_root
             .canonicalize()
             .unwrap_or_else(|_| project_root.to_path_buf());
@@ -963,6 +974,40 @@ fn print_codex_fallback(install: &CodexMcpInstall) {
     eprintln!("{}", install.fallback_config_toml());
 }
 
+fn resolve_ast_index_bin_from(
+    invoked_as: Option<&OsStr>,
+    cwd: &Path,
+    path_env: Option<&OsString>,
+) -> Option<PathBuf> {
+    let invoked_as = invoked_as?;
+    if invoked_as.is_empty() {
+        return None;
+    }
+
+    let invoked_path = Path::new(invoked_as);
+    if invoked_path.is_absolute() {
+        return Some(normalize_dot_components(invoked_path));
+    }
+    if invoked_path.components().count() > 1 {
+        return Some(normalize_dot_components(&cwd.join(invoked_path)));
+    }
+
+    let invoked_name = invoked_as.to_string_lossy();
+    find_on_path(&invoked_name, path_env)
+        .or_else(|| find_on_path(ast_index_exe_name(), path_env))
+}
+
+fn normalize_dot_components(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        if matches!(component, std::path::Component::CurDir) {
+            continue;
+        }
+        out.push(component.as_os_str());
+    }
+    out
+}
+
 fn resolve_ast_index_mcp_bin_from(
     current_exe: &Path,
     path_env: Option<&OsString>,
@@ -985,6 +1030,14 @@ fn resolve_ast_index_mcp_bin_from(
         exe_name,
         current_exe.display()
     ))
+}
+
+fn ast_index_exe_name() -> &'static str {
+    if cfg!(windows) {
+        "ast-index.exe"
+    } else {
+        "ast-index"
+    }
 }
 
 fn ast_index_mcp_exe_name() -> &'static str {
@@ -1538,6 +1591,47 @@ mod codex_mcp_install_tests {
         assert!(out.contains("AST_INDEX_BIN=/bin/ast-index"));
         assert!(out.contains("[mcp_servers.ast-index]"));
         assert!(out.contains("command = \"/bin/ast-index-mcp\""));
+    }
+
+    #[test]
+    fn resolve_ast_index_bin_uses_path_for_bare_invocation() {
+        let tmp = TempDir::new().unwrap();
+        let path_dir = tmp.path().join("path-bin");
+        fs::create_dir_all(&path_dir).unwrap();
+        let path_bin = fake_exe(&path_dir, "ast-index");
+
+        let got = resolve_ast_index_bin_from(
+            Some(OsStr::new("ast-index")),
+            tmp.path(),
+            Some(&OsString::from(&path_dir)),
+        )
+        .unwrap();
+
+        assert_eq!(got, path_bin);
+    }
+
+    #[test]
+    fn resolve_ast_index_bin_keeps_relative_invocation_without_canonicalizing() {
+        let tmp = TempDir::new().unwrap();
+        let invoked = Path::new(".")
+            .join("target")
+            .join("release")
+            .join(ast_index_exe_name());
+
+        let got = resolve_ast_index_bin_from(
+            Some(invoked.as_os_str()),
+            tmp.path(),
+            Some(&OsString::new()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            got,
+            tmp.path()
+                .join("target")
+                .join("release")
+                .join(ast_index_exe_name())
+        );
     }
 
     #[test]

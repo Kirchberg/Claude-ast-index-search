@@ -5,7 +5,7 @@
 # Single entrypoint that runs every gate a PR has to pass before review:
 #   1. cargo build --release --workspace        (compiles the entire workspace)
 #   2. cargo test  --release --workspace        (unit + integration + proptest)
-#   3. scripts/smoke.sh                         (6 CLI end-to-end scenarios)
+#   3. scripts/smoke.sh                         (7 CLI end-to-end scenarios)
 #   4. cargo bench --no-run                     (benches compile, not run)
 #
 # Prints a single combined summary at the end. Exits non-zero if any step
